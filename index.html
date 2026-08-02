@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Buckets &amp; Barangays</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css" rel="stylesheet" />
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js"></script>
+<script src="https://unpkg.com/scrollama"></script>
+<script src="https://unpkg.com/@turf/turf@7/turf.min.js"></script>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --gridline: #e1e0d9;
+    --orange: #f0651c;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--text-primary);
+    background: var(--surface-1);
+  }
+
+  #map {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  #scroll {
+    position: relative;
+    z-index: 1;
+  }
+
+  .intro, .outro {
+    position: relative;
+    min-height: 55vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    text-align: center;
+  }
+  .intro {
+    min-height: 100vh;
+    overflow: hidden;
+    background: #0b0b0b;
+  }
+  .intro-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .intro-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.65) 100%);
+  }
+  .intro-text {
+    position: relative;
+    z-index: 1;
+  }
+  .intro h1 {
+    font-size: clamp(32px, 6vw, 56px);
+    max-width: 720px;
+    line-height: 1.15;
+    margin: 0 0 2px;
+    color: #ffffff;
+  }
+  .intro p.dek {
+    max-width: 540px;
+    font-size: 19px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: #ffffff;
+    margin: 0 0 18px;
+  }
+  .intro p.sub {
+    max-width: 520px;
+    font-size: 15px;
+    line-height: 1.6;
+    color: rgba(255,255,255,0.8);
+    margin: 0 auto;
+  }
+  .outro { background: var(--surface-1); }
+  .outro h2 { margin: 0 0 12px; }
+  .outro p { color: var(--text-secondary); max-width: 560px; font-size: 14px; line-height: 1.6; }
+  .outro.credits { min-height: auto; padding: 24px; }
+  .outro.credits p { font-size: 12px; color: var(--muted); }
+  .outro.credits a { color: var(--muted); }
+  .outro.outro-left { text-align: left; }
+  .outro.outro-left > div { max-width: 680px; width: 100%; }
+  .outro.outro-left h2 { text-align: left; }
+  .outro.outro-left p { text-align: left; }
+  .outro.outro-left summary {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 0 0 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .outro.outro-left details p { margin-top: 12px; }
+  .outro.outro-left { min-height: auto; padding: 24px 24px; }
+  .outro-photo {
+    position: relative;
+    background: var(--surface-1);
+    padding: 64px 24px 32px;
+    text-align: center;
+  }
+  .outro-photo img {
+    max-width: 680px;
+    width: 100%;
+    display: block;
+    margin: 0 auto;
+    border-radius: 4px;
+  }
+  .outro-photo .photo-caption {
+    max-width: 680px;
+    margin: 14px auto 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .outro-photo .photo-credit {
+    max-width: 680px;
+    margin: 6px auto 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .intro-article {
+    position: relative;
+    z-index: 1;
+    background: var(--surface-1);
+    width: 100%;
+    padding: 48px 24px 96px;
+  }
+  .intro-article-inner {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+  .intro-article h2 {
+    font-size: 26px;
+    line-height: 1.3;
+    margin: 0 0 18px;
+  }
+  .intro-article p {
+    font-size: 17px;
+    line-height: 1.75;
+    color: var(--text-secondary);
+    margin: 0 0 20px;
+  }
+  .intro-article .photo-row {
+    display: flex;
+    gap: 12px;
+    margin: 32px 0;
+  }
+  .intro-article .photo-credit {
+    margin: -22px 0 20px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .intro-article .photo-credit a { color: var(--muted); }
+  .intro-article .photo-placeholder,
+  .intro-article .photo-row img {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: var(--gridline);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+    padding: 8px;
+    object-fit: cover;
+  }
+  .intro-article blockquote {
+    margin: 40px 0;
+    padding: 4px 0 4px 20px;
+    border-left: 3px solid var(--orange);
+  }
+  .intro-article blockquote p {
+    font-size: 21px;
+    font-style: italic;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.5;
+    margin: 0 0 10px;
+  }
+  .intro-article blockquote cite {
+    font-style: normal;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .step {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 40px 24px;
+  }
+  .step-content {
+    background: rgba(252, 252, 251, 0.94);
+    border: 1px solid var(--gridline);
+    border-radius: 10px;
+    padding: 20px 24px;
+    max-width: 380px;
+    box-shadow: 0 4px 20px rgba(11,11,11,0.18);
+  }
+  .step-content h2 {
+    font-size: 18px;
+    margin: 0 0 8px;
+    line-height: 1.35;
+  }
+  .step-content p {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+  .step-content .stat {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 4px 0;
+    color: var(--orange);
+    font-variant-numeric: tabular-nums;
+  }
+
+  #legend {
+    position: fixed;
+    bottom: 24px;
+    right: 16px;
+    z-index: 2;
+    background: var(--surface-1);
+    border: 1px solid var(--gridline);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+    box-shadow: 0 1px 4px rgba(11,11,11,0.10);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  #legend.visible { opacity: 1; }
+  #legend .block { margin-bottom: 10px; }
+  #legend .block:last-child { margin-bottom: 0; }
+  #legend .label { color: var(--text-secondary); font-size: 11px; margin-bottom: 4px; }
+  #legend .ramp { display: flex; height: 10px; border-radius: 2px; overflow: hidden; width: 160px; }
+  #legend .ramp span { flex: 1; }
+  #legend .ramp-ticks { display: flex; justify-content: space-between; width: 160px; color: var(--muted); font-size: 10px; margin-top: 2px; }
+  #legend .dot-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  #legend .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="legend">
+  <div class="block" id="legend-ramp-block">
+    <div class="label" id="legend-label">Courts per 100,000 residents</div>
+    <div class="ramp">
+      <span style="background:#fee4c8"></span>
+      <span style="background:#feb877"></span>
+      <span style="background:#fa8a2f"></span>
+      <span style="background:#f0651c"></span>
+      <span style="background:#b8430a"></span>
+      <span style="background:#7a2c08"></span>
+    </div>
+    <div class="ramp-ticks"><span>0</span><span id="legend-max">25+</span></div>
+  </div>
+  <div class="block">
+    <div class="label">Individual courts</div>
+    <div class="dot-row"><span class="dot" style="background:#ffffff; border:1.5px solid #0b0b0b;"></span> Outdoor pitch</div>
+    <div class="dot-row"><span class="dot" style="background:#0b0b0b; border:1.5px solid #ffffff; box-shadow:0 0 0 1px rgba(11,11,11,0.25);"></span> Covered court / gym</div>
+  </div>
+</div>
+
+<div class="intro">
+  <video class="intro-video" id="intro-video" src="basketball_banner.mp4" autoplay muted playsinline></video>
+  <div class="intro-overlay"></div>
+  <div class="intro-text">
+    <h1>Buckets &amp; Barangays</h1>
+    <p class="dek">Mapping basketball courts across the Philippines.</p>
+    <p class="sub">Jon Viktor D. Cabuenas</p>
+  </div>
+</div>
+
+<article class="intro-article">
+  <div class="intro-article-inner">
+    <p><strong>In the Philippines, three Bs stand out: boxing, beauty pageants, and basketball.</strong><br>Out of the three, basketball has become deeply ingrained in everyday life. From makeshift backboards nailed to trees to covered courts at the heart of barangays — the country's smallest government units — hoops can be found almost everywhere.</p>
+    <p>Ask a first-time visitor to count the basketball hoops they pass on a drive through the Philippines, and they'll likely lose track before the journey ends.</p>
+
+    <blockquote>
+      <p>"Of all the places that I've traveled, this has so much passion and enthusiasm for the game."</p>
+      <cite>— Kobe Bryant</cite>
+    </blockquote>
+
+    <div class="photo-row">
+      <img src="photos/kobe_tribute.png" alt="Kobe Bryant tribute mural, painted on court">
+      <img src="photos/doncic_tribute.png" alt="Luka Dončić tribute mural, painted on court">
+    </div>
+    <p class="photo-credit">Artist: <a href="https://www.instagram.com/themayacarandang/" target="_blank" rel="noopener">@themayacarandang</a> || <a href="https://www.instagram.com/themayacarandang/" target="_blank" rel="noopener">Instagram</a></p>
+
+    <p>Philippine hoops appear in various forms — a rim nailed to a tree, a painted court on public pavement, or a covered court at the center of a barangay. Parking lots become makeshift courts, while quiet residential streets transform into playing surfaces when traffic dies down. Sometimes even if it doesn't. Many of these informal spaces never make it onto a map.</p>
+
+    <div class="photo-row">
+      <img src="photos/makeshift-1.jpg" alt="Kids playing basketball outdoors in a rural area">
+      <img src="photos/makeshift-2.jpg" alt="Makeshift hoop nailed between palm trees on a beach in Siargao">
+    </div>
+    <p class="photo-credit">Photos: <a href="https://www.pexels.com/@denniz-futalan-339724/" target="_blank" rel="noopener">Denniz Futalan</a> / <a href="https://www.pexels.com/photo/kids-playing-basketball-outdoors-in-rural-area-28808458/" target="_blank" rel="noopener">Pexels</a>; <a href="https://unsplash.com/@bruncolombo" target="_blank" rel="noopener">Adrien Brun</a> / <a href="https://unsplash.com/photos/sSpjhyLM8dQ" target="_blank" rel="noopener">Unsplash</a></p>
+
+    <blockquote>
+      <p>"Anywhere you look you can see groups of kids playing on a makeshift basket on a telephone pole, on the side of a building, in 3 feet of rainwater... It's a powerful visual."</p>
+      <cite>— Erik Spoelstra, Filipino-American NBA coach</cite>
+    </blockquote>
+  </div>
+</article>
+
+<div id="scroll">
+
+  <section class="step" data-step="0">
+    <div class="step-content">
+      <h2>But what does the craze look like on a map?</h2>
+      <p>In the Philippines, basketball spills into neighborhoods, schoolyards, parks, and village plazas. From improvised hoops to full-sized covered courts, the game is woven into daily life.</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="1">
+    <div class="step-content">
+      <h2>A nation built around the hoop</h2>
+      <p>At least 24,000 basketball courts have been mapped across the Philippines, from outdoor courts and covered gyms to neighborhood hoops documented by volunteers. Countless more informal courts may exist but have yet to be recorded.</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="2">
+    <div class="step-content">
+      <h2>Metro Manila</h2>
+      <p>The capital region, home to 17 cities and municipalities, has 2,192 mapped courts, outdoor pitches and covered gyms alike.</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="3">
+    <div class="step-content">
+      <h2>Who has the most courts?</h2>
+      <p>Larger cities tend to have more basketball courts because they have more people. Metro Manila turns out to be uneven, and on the whole, has less courts than the national rate — 21.3 / 100k — once population is accounted for.</p>
+      <div class="stat">15.7 / 100k</div>
+      <p>Metro Manila's rate, versus 21.3 nationwide.</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="4">
+    <div class="step-content">
+      <h2>How dense are they?</h2>
+      <p>Measuring courts per square kilometer highlights where basketball infrastructure is physically concentrated. Mandaluyong ranks near the bottom in courts per capita but climbs to second in court density because of its compact size.</p>
+      <div class="stat">5.71 / km²</div>
+      <p>Mandaluyong's density, vs. 13.95 per 100k residents.</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="5">
+    <div class="step-content">
+      <h2>Taguig</h2>
+      <p>Among Metro Manila's cities is Taguig, home to Bonifacio Global City and one of the country's most recognizable basketball courts. Hidden inside the Tenement housing complex in Western Bicutan, the court has become an icon in Philippine basketball culture.</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="6">
+    <div class="step-content">
+      <h2>The Tenement</h2>
+      <p>Tucked between rows of apartment buildings, the Tenement basketball court has become a symbol of Philippine basketball culture. The public housing complex has welcomed global athletes and filmmakers, with its court being repainted several times — including murals honoring Kobe and Gianna.</p>
+    </div>
+  </section>
+
+  <section class="step" data-step="7">
+    <div class="step-content">
+      <h2>Seen from above</h2>
+      <p>The Tenement court looks no different from thousands of others scattered across the Philippines. That's the point.</p>
+    </div>
+  </section>
+
+</div>
+
+<div class="outro-photo">
+  <img src="photos/tenement_kobe_gianna.jpg" alt="Aerial view of a black-and-white Kobe and Gianna Bryant mural painted across the basketball court at the Tenement in Manila">
+  <p class="photo-caption">The tenement court painted in tribute for Kobe and Gianna Bryant after their passing in 2020.</p>
+  <p class="photo-credit">Photo: Tenement Visual Artists / Facebook</p>
+</div>
+
+<div class="outro outro-left">
+  <div>
+    <h2>A nationwide network</h2>
+    <p>While only a handful of courts have gained international recognition, countless others continue to quietly serve the same purpose — a venue for communities to come together one game at a time. Together, they form a nationwide network that reflects the country's passion for the game.</p>
+    <p>This dataset captures only courts that have been mapped, and thousands of improvised hoops and informal spaces remain invisible. A reminder that the country's basketball story extends beyond what any map can show.</p>
+  </div>
+</div>
+
+<div class="outro outro-left">
+  <div>
+    <details>
+      <summary>Methodology</summary>
+      <p>Court counts and locations come from live queries to OpenStreetMap's Overpass API, cross-checked against each city's actual administrative boundary rather than a bounding box. Population figures are from the Philippine Statistics Authority's 2024 Census of Population. Full methodology and code: <code>basketball_courts.ipynb</code>.</p>
+    </details>
+  </div>
+</div>
+
+<div class="outro credits">
+  <div>
+    <p>Done as a project for the Lede Program at Columbia University.</p>
+    <p>Data: OpenStreetMap Overpass API (basketball courts), Philippine Statistics Authority 2024 Census of Population (population, land area).</p>
+    <p>Code and full analysis on GitHub.</p>
+    <p>Header video by <a href="https://www.pexels.com/@ian-panelo/" target="_blank" rel="noopener">Ian Panelo</a>, via <a href="https://www.pexels.com/video/public-basketball-hoop-15024530/" target="_blank" rel="noopener">Pexels</a>.</p>
+  </div>
+</div>
+
+<script>
+  // Intro banner video: loop only the first ~7 seconds rather than the
+  // whole clip (avoids needing to re-encode/trim the source file).
+  const introVideo = document.getElementById("intro-video");
+  introVideo.addEventListener("timeupdate", () => {
+    if (introVideo.currentTime > 7) introVideo.currentTime = 0;
+  });
+
+  mapboxgl.accessToken = "pk.eyJ1Ijoiam9udmlrdG9yIiwiYSI6ImNtcWk0cm5ocTAzMWIycnExcjczNGZ6b3kifQ.MbltXjdx3D0WJqiAHH8LZw";
+
+  const TENEMENT = [121.0373289, 14.5086404]; // outdoor pitch at the Tenement building itself (not the roofed "Tenement Gymnasium")
+  const TAGUIG_CENTER = [121.0630412, 14.5070845];
+  const METRO_CENTER = [121.02, 14.58];
+  const PH_CENTER = [122.0, 12.3];
+
+  // Same 6-step orange ramp, applied to two different underlying fields.
+  const COLOR_EXPRESSIONS = {
+    per100k: [
+      "interpolate", ["linear"], ["get", "courts_per_100k"],
+      0, "#fee4c8", 5, "#feb877", 10, "#fa8a2f",
+      15, "#f0651c", 20, "#b8430a", 25, "#7a2c08",
+    ],
+    perkm2: [
+      "interpolate", ["linear"], ["get", "courts_per_km2"],
+      0, "#fee4c8", 1.6, "#feb877", 3.2,  "#fa8a2f",
+      4.8, "#f0651c", 6.4, "#b8430a", 8, "#7a2c08",
+    ],
+  };
+  const LEGEND_TEXT = {
+    per100k: { label: "Courts per 100,000 residents", max: "25+" },
+    perkm2: { label: "Courts per square kilometer", max: "8+" },
+  };
+
+  const map = new mapboxgl.Map({
+    container: "map",
+    style: "mapbox://styles/mapbox/light-v11",
+    center: PH_CENTER,
+    zoom: 5.1,
+    projection: "mercator",
+  });
+
+  map.scrollZoom.disable();
+  map.addControl(new mapboxgl.NavigationControl(), "top-right");
+
+  const FADE = 700;
+
+  function withFade(layerId, prop) {
+    map.setPaintProperty(layerId, `${prop}-transition`, { duration: FADE });
+  }
+
+  map.on("load", () => {
+    // ---- Tenement court highlight marker ----
+    map.addSource("tenement", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [
+        { type: "Feature", geometry: { type: "Point", coordinates: TENEMENT }, properties: {} },
+      ] },
+    });
+    map.addLayer({
+      id: "tenement-marker",
+      type: "circle",
+      source: "tenement",
+      paint: {
+        "circle-radius": 8,
+        "circle-color": "#f0651c",
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ffffff",
+        "circle-opacity": 0,
+      },
+    });
+
+    // ---- Metro Manila LGU polygons: Taguig highlight + full choropleth ----
+    map.addSource("lgus", { type: "geojson", data: "metro_manila_lgus.geojson" });
+
+    map.addLayer({
+      id: "lgu-taguig-highlight",
+      type: "line",
+      source: "lgus",
+      filter: ["==", ["get", "city"], "Taguig"],
+      paint: { "line-color": "#f0651c", "line-width": 3, "line-opacity": 0 },
+    });
+
+    map.addLayer({
+      id: "lgu-choropleth",
+      type: "fill",
+      source: "lgus",
+      paint: {
+        "fill-color": COLOR_EXPRESSIONS.per100k,
+        "fill-opacity": 0,
+      },
+    });
+
+    map.addLayer({
+      id: "lgu-outline",
+      type: "line",
+      source: "lgus",
+      paint: { "line-color": "#ffffff", "line-width": 1, "line-opacity": 0 },
+    });
+
+    // ---- Metro Manila outer boundary: dissolve all 17 city polygons into
+    // one outline (rather than each city's own border) via turf.union ----
+    fetch("metro_manila_lgus.geojson")
+      .then((r) => r.json())
+      .then((lguData) => {
+        // Adjacent city polygons rarely share pixel-perfect matching edges
+        // (independently simplified/digitized), so a straight union leaves
+        // sliver fragments of the *internal* borders behind instead of a
+        // clean outer perimeter. Buffering each polygon out by a few meters
+        // first closes those tiny gaps so the union actually merges cleanly.
+        const buffered = lguData.features.map((f) => turf.buffer(f, 0.01, { units: "kilometers" }));
+        const dissolved = buffered.reduce((acc, f) =>
+          acc ? turf.union(turf.featureCollection([acc, f])) : f, null);
+
+        map.addSource("metro-boundary", { type: "geojson", data: dissolved });
+        map.addLayer({
+          id: "metro-boundary-line",
+          type: "line",
+          source: "metro-boundary",
+          paint: { "line-color": "#f0651c", "line-width": 3, "line-opacity": 0 },
+        }, "lgu-taguig-highlight");
+        withFade("metro-boundary-line", "line-opacity");
+        applyState(currentStep); // in case this loaded after a step already fired
+      });
+
+    // ---- Metro Manila individual court points ----
+    map.addSource("courts", { type: "geojson", data: "courts.geojson" });
+    map.addLayer({
+      id: "metro-points",
+      type: "circle",
+      source: "courts",
+      paint: {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 2, 14, 4.5],
+        "circle-color": ["match", ["get", "category"], "outdoor", "#ffffff", "covered", "#0b0b0b", "#898781"],
+        "circle-stroke-width": 1,
+        "circle-stroke-color": ["match", ["get", "category"], "outdoor", "#0b0b0b", "covered", "#ffffff", "#fcfcfb"],
+        "circle-opacity": 0,
+        "circle-stroke-opacity": 0,
+      },
+    });
+
+    // ---- Philippines outline (flat orange) ----
+    map.addSource("philippines", { type: "geojson", data: "philippines.geojson" });
+    map.addLayer({
+      id: "ph-fill",
+      type: "fill",
+      source: "philippines",
+      paint: { "fill-color": "#f0651c", "fill-opacity": 0 },
+    });
+    map.addLayer({
+      id: "ph-outline",
+      type: "line",
+      source: "philippines",
+      paint: { "line-color": "#ffffff", "line-width": 0.6, "line-opacity": 0 },
+    });
+
+    // ---- Nationwide court points, clustered ----
+    map.addSource("nationwide", {
+      type: "geojson",
+      data: "nationwide_courts.geojson",
+      cluster: true,
+      clusterRadius: 40,
+      clusterMaxZoom: 9,
+    });
+    map.addLayer({
+      id: "nationwide-clusters",
+      type: "circle",
+      source: "nationwide",
+      filter: ["has", "point_count"],
+      paint: {
+        "circle-color": "#f0651c",
+        "circle-opacity": 0,
+        "circle-stroke-width": 1,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-opacity": 0,
+        "circle-radius": ["step", ["get", "point_count"], 10, 25, 16, 100, 22, 500, 30],
+      },
+    });
+    map.addLayer({
+      id: "nationwide-cluster-count",
+      type: "symbol",
+      source: "nationwide",
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": ["get", "point_count_abbreviated"],
+        "text-font": ["DIN Pro Medium", "Arial Unicode MS Bold"],
+        "text-size": 11,
+      },
+      paint: { "text-color": "#ffffff", "text-opacity": 0 },
+    });
+    map.addLayer({
+      id: "nationwide-unclustered",
+      type: "circle",
+      source: "nationwide",
+      filter: ["!", ["has", "point_count"]],
+      paint: {
+        "circle-radius": 3,
+        "circle-color": ["match", ["get", "category"], "outdoor", "#ffffff", "covered", "#0b0b0b", "#898781"],
+        "circle-stroke-width": 0.8,
+        "circle-stroke-color": ["match", ["get", "category"], "outdoor", "#0b0b0b", "covered", "#ffffff", "#fcfcfb"],
+        "circle-opacity": 0,
+        "circle-stroke-opacity": 0,
+      },
+    });
+
+    // Enable smooth cross-fades for every opacity property we'll animate
+    [
+      ["tenement-marker", "circle-opacity"],
+      ["lgu-taguig-highlight", "line-opacity"],
+      ["lgu-choropleth", "fill-opacity"],
+      ["lgu-outline", "line-opacity"],
+      ["metro-points", "circle-opacity"],
+      ["metro-points", "circle-stroke-opacity"],
+      ["ph-fill", "fill-opacity"],
+      ["ph-outline", "line-opacity"],
+      ["nationwide-clusters", "circle-opacity"],
+      ["nationwide-clusters", "circle-stroke-opacity"],
+      ["nationwide-cluster-count", "text-opacity"],
+      ["nationwide-unclustered", "circle-opacity"],
+      ["nationwide-unclustered", "circle-stroke-opacity"],
+    ].forEach(([id, prop]) => withFade(id, prop));
+
+    initScrollytelling();
+  });
+
+  const legend = document.getElementById("legend");
+  const legendRampBlock = document.getElementById("legend-ramp-block");
+  const legendLabel = document.getElementById("legend-label");
+  const legendMax = document.getElementById("legend-max");
+
+  // Every step defines its COMPLETE layer state -- not a diff from the
+  // previous step -- so the scene is always correct regardless of scroll
+  // direction, speed, or a step being skipped (fast scroll, resize
+  // recalculation, browser back/forward all can fire steps out of the
+  // "expected" order).
+  const BASE_OFF = {
+    "tenement-marker": { "circle-opacity": 0 },
+    "lgu-taguig-highlight": { "line-opacity": 0 },
+    "lgu-outline": { "line-opacity": 0 },
+    "lgu-choropleth": { "fill-opacity": 0 },
+    "metro-boundary-line": { "line-opacity": 0 },
+    "metro-points": { "circle-opacity": 0, "circle-stroke-opacity": 0 },
+    "ph-fill": { "fill-opacity": 0 },
+    "ph-outline": { "line-opacity": 0 },
+    "nationwide-clusters": { "circle-opacity": 0, "circle-stroke-opacity": 0 },
+    "nationwide-cluster-count": { "text-opacity": 0 },
+    "nationwide-unclustered": { "circle-opacity": 0, "circle-stroke-opacity": 0 },
+  };
+
+  function withOverrides(overrides) {
+    const merged = JSON.parse(JSON.stringify(BASE_OFF));
+    for (const [layer, props] of Object.entries(overrides)) {
+      merged[layer] = { ...merged[layer], ...props };
+    }
+    return merged;
+  }
+
+  const STEP_STATES = [
+    { // 0: Philippines, orange
+      camera: { center: PH_CENTER, zoom: 5.1 },
+      style: "vector",
+      legend: false,
+      opacity: withOverrides({
+        "ph-fill": { "fill-opacity": 0.88 },
+        "ph-outline": { "line-opacity": 0.8 },
+      }),
+    },
+    { // 1: Nationwide courts
+      camera: { center: PH_CENTER, zoom: 5.1 },
+      style: "vector",
+      legend: false,
+      opacity: withOverrides({
+        "ph-fill": { "fill-opacity": 0.15 },
+        "ph-outline": { "line-opacity": 0.3 },
+        "nationwide-clusters": { "circle-opacity": 0.85, "circle-stroke-opacity": 1 },
+        "nationwide-cluster-count": { "text-opacity": 1 },
+        "nationwide-unclustered": { "circle-opacity": 0.9, "circle-stroke-opacity": 1 },
+      }),
+    },
+    { // 2: Metro Manila points
+      camera: { center: METRO_CENTER, zoom: 10.3 },
+      style: "vector",
+      legend: "points",
+      opacity: withOverrides({
+        "lgu-outline": { "line-opacity": 0.5 },
+        "metro-boundary-line": { "line-opacity": 1 },
+        "metro-points": { "circle-opacity": 0.9, "circle-stroke-opacity": 1 },
+      }),
+    },
+    { // 3: Metro Manila choropleth, per capita
+      camera: { center: METRO_CENTER, zoom: 10.3 },
+      style: "vector",
+      legend: "choropleth",
+      colorField: "per100k",
+      opacity: withOverrides({
+        "lgu-outline": { "line-opacity": 0.5 },
+        "lgu-choropleth": { "fill-opacity": 0.8 },
+        "metro-boundary-line": { "line-opacity": 1 },
+        "metro-points": { "circle-opacity": 0.35, "circle-stroke-opacity": 0.5 },
+      }),
+    },
+    { // 4: Metro Manila choropleth, per land area
+      camera: { center: METRO_CENTER, zoom: 10.3 },
+      style: "vector",
+      legend: "choropleth",
+      colorField: "perkm2",
+      opacity: withOverrides({
+        "lgu-outline": { "line-opacity": 0.5 },
+        "lgu-choropleth": { "fill-opacity": 0.8 },
+        "metro-boundary-line": { "line-opacity": 1 },
+        "metro-points": { "circle-opacity": 0.35, "circle-stroke-opacity": 0.5 },
+      }),
+    },
+    { // 5: Taguig
+      camera: { center: TAGUIG_CENTER, zoom: 12.4 },
+      style: "vector",
+      legend: false,
+      opacity: withOverrides({
+        "lgu-outline": { "line-opacity": 0.5 },
+        "lgu-taguig-highlight": { "line-opacity": 1 },
+        "metro-points": { "circle-opacity": 0.9, "circle-stroke-opacity": 1 },
+      }),
+    },
+    { // 6: The Tenement (still vector, closer zoom, marker highlighted)
+      camera: { center: TENEMENT, zoom: 16 },
+      style: "vector",
+      legend: false,
+      opacity: withOverrides({
+        "lgu-taguig-highlight": { "line-opacity": 1 },
+        "tenement-marker": { "circle-opacity": 1 },
+        "metro-points": { "circle-opacity": 0.9, "circle-stroke-opacity": 1 },
+      }),
+    },
+    { // 7: Satellite aerial zoom-in on the Tenement
+      camera: { center: TENEMENT, zoom: 19, pitch: 45 },
+      style: "satellite",
+      legend: false,
+      opacity: withOverrides({}),
+    },
+  ];
+
+  let currentStep = -1;
+  let satelliteLoaded = false;
+
+  function applyOpacity(opacity) {
+    for (const [layerId, props] of Object.entries(opacity)) {
+      if (!map.getLayer(layerId)) continue; // e.g. metro-boundary-line loads async via fetch
+      for (const [prop, value] of Object.entries(props)) {
+        map.setPaintProperty(layerId, prop, value);
+      }
+    }
+  }
+
+  function addSatelliteTenementMarker() {
+    if (map.getSource("tenement-sat")) return;
+    map.addSource("tenement-sat", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [
+        { type: "Feature", geometry: { type: "Point", coordinates: TENEMENT }, properties: {} },
+      ] },
+    });
+    map.addLayer({
+      id: "tenement-sat-marker",
+      type: "circle",
+      source: "tenement-sat",
+      paint: {
+        "circle-radius": 8,
+        "circle-color": "#f0651c",
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ffffff",
+        "circle-opacity": 1,
+      },
+    });
+  }
+
+  function applyState(step) {
+    const state = STEP_STATES[step];
+    if (!state) return;
+
+    if (state.style === "satellite") {
+      if (!satelliteLoaded) {
+        satelliteLoaded = true;
+        map.setStyle("mapbox://styles/mapbox/satellite-streets-v12");
+        map.once("style.load", () => {
+          addSatelliteTenementMarker();
+          map.flyTo({ ...state.camera, duration: 1800 });
+        });
+      } else {
+        map.flyTo({ ...state.camera, duration: 1800 });
+      }
+      return;
+    }
+
+    // Coming back to a vector step after satellite has loaded: restore style.
+    if (satelliteLoaded) {
+      satelliteLoaded = false;
+      map.setStyle("mapbox://styles/mapbox/light-v11");
+      map.once("style.load", () => {
+        // Layers were wiped by setStyle; the load handler that built them
+        // only runs once, so just reload the page-scoped sources/layers.
+        location.reload();
+      });
+      return;
+    }
+
+    map.flyTo({ ...state.camera, duration: 1400 });
+    applyOpacity(state.opacity);
+
+    if (state.colorField && map.getLayer("lgu-choropleth")) {
+      map.setPaintProperty("lgu-choropleth", "fill-color", COLOR_EXPRESSIONS[state.colorField]);
+      legendLabel.textContent = LEGEND_TEXT[state.colorField].label;
+      legendMax.textContent = LEGEND_TEXT[state.colorField].max;
+    }
+
+    legendRampBlock.style.display = state.legend === "choropleth" ? "block" : "none";
+    legend.classList.toggle("visible", state.legend === "points" || state.legend === "choropleth");
+  }
+
+  function goToStep(step) {
+    if (step === currentStep) return;
+    currentStep = step;
+    applyState(step);
+  }
+
+  function initScrollytelling() {
+    const scroller = scrollama();
+    scroller
+      .setup({
+        step: ".step",
+        offset: 0.6,
+      })
+      .onStepEnter((response) => {
+        goToStep(Number(response.element.dataset.step));
+      });
+
+    window.addEventListener("resize", scroller.resize);
+
+    // Start on step 0's state before any scrolling
+    goToStep(0);
+  }
+</script>
+
+</body>
+</html>
