@@ -2,7 +2,7 @@
 
 A scrollytelling story testing whether the Philippines really has the most basketball courts per capita in the world — built with live OpenStreetMap data for the Lede Program at Columbia University.
 
-**[Read the story →](#)** *(add your GitHub Pages link once it's live)*
+**[Read the story →](https://jonvikktor.github.io/buckets_and_barangays/)**
 
 Finding: Metro Manila actually trails the national rate — 15.7 courts per 100,000 residents vs. 21.3 nationwide.
 
